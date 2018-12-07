@@ -2,7 +2,10 @@
 #
 # Stops all Docker services, stacks and containers, removes unused data
 # and takes down the node from a swarm.  Volumes are retained but can be
-# removed by adding "--volumes" to line 32.
+# removed by passing "--volumes" as an argument to this script.
+#
+# Passing "--all" as an argument will remove all images and not just dangling
+# images.
 #
 # IMPORTANT NOTE - use with Docker 17.06.1 or higher.  Script will remove all
 # volumes for earlier versions.  Use at own risk!
@@ -29,17 +32,58 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Stop all running services
-docker service rm $(docker service ls -q)
+# Parse arguments
+while [ $# -gt 0 ]; do
+	case $1 in
+		--volumes)
+			EXTRA_PRUNE_ARGS="$EXTRA_PRUNE_ARGS --volumes"
+			;;
+		--all)
+			EXTRA_PRUNE_ARGS="$EXTRA_PRUNE_ARGS --all"
+			;;
+	esac
+	shift
+done
 
-# Tear down all applications
-docker stack rm $(docker stack ls --format "{{.Name}}")
+# Check if this host is part of a swarm
+[ ! "$(docker info | grep 'Swarm' | sed 's/Swarm: //g')" = "active" ]
+IS_IN_SWARM=$?
+
+[ ! "$(docker info | grep 'Is Manager' | sed 's/ Is Manager: //g')" = "true" ]
+IS_SWARM_MANAGER=$?
+
+# If we're a swarm manager, kill services and stacks
+if [ "$IS_SWARM_MANAGER" = "1" ]; then
+	# Stop all running services
+	SERVICES=$(docker service ls -q)
+	if [ ! -z "$SERVICES" ]; then
+		echo "Removing services..."
+		docker service rm $SERVICES
+		echo
+	fi
+
+	# Tear down all stacks
+	STACKS=$(docker stack ls --format "{{.Name}}")
+	if [[ ! -z $STACKS ]]; then
+		echo "Removing stacks..."
+		docker stack rm $STACKS
+		echo
+	fi
+fi
 
 # Stop any remaining running containers and remove all old containers
-docker stop $(docker ps -a -q)
-
-# Remove unused containers, networks and images (SEE IMPORTANT NOTE ABOVE)
-docker system prune
+CONTAINERS=$(docker ps -a -q)
+if [[ ! -z $STACKS ]]; then
+	echo "Stopping containers..."
+	docker stop $CONTAINERS
+	echo
+fi
 
 # Remove node from the swarm (if in one)
-docker swarm leave --force
+if [ "$IS_IN_SWARM" = "1" ]; then
+	docker swarm leave --force
+	echo
+fi
+
+# Remove unused containers, networks and images (SEE IMPORTANT NOTE ABOVE)
+docker system prune --force $EXTRA_PRUNE_ARGS
