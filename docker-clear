@@ -64,7 +64,7 @@ if [ "$IS_SWARM_MANAGER" = "1" ]; then
 
 	# Tear down all stacks
 	STACKS=$(docker stack ls --format "{{.Name}}")
-	if [[ ! -z $STACKS ]]; then
+	if [ ! -z "$STACKS" ]; then
 		echo "Removing stacks..."
 		docker stack rm $STACKS
 		echo
@@ -73,7 +73,7 @@ fi
 
 # Stop any remaining running containers and remove all old containers
 CONTAINERS=$(docker ps -a -q)
-if [[ ! -z $STACKS ]]; then
+if [ ! -z "$STACKS" ]; then
 	echo "Stopping containers..."
 	docker stop $CONTAINERS
 	echo
