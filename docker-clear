@@ -73,7 +73,7 @@ fi
 
 # Stop any remaining running containers and remove all old containers
 CONTAINERS=$(docker ps -a -q)
-if [ ! -z "$STACKS" ]; then
+if [ ! -z "$CONTAINERS" ]; then
 	echo "Stopping containers..."
 	docker stop $CONTAINERS
 	echo
